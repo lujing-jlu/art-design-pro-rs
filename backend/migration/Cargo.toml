@@ -1,0 +1,10 @@
+[package]
+name = "migration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sea-orm-migration = "0.12"
+entity = { path = "../entity" }
+common = { path = "../common" }
+async-std = { version = "1", features = ["attributes", "tokio1"] }

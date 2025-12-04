@@ -1,0 +1,40 @@
+# Frontend Reference (原始模板)
+frontend-reference/
+
+# Rust
+backend/target/
+backend/**/target/
+backend/**/*.rs.bk
+backend/Cargo.lock
+backend/data.db
+backend/data.db-shm
+backend/data.db-wal
+backend/uploads/
+
+# Node.js
+frontend/node_modules/
+frontend/dist/
+frontend/.temp/
+frontend/.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
