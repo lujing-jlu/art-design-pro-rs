@@ -32,7 +32,7 @@ Art Design Pro RS is a full-stack admin dashboard system featuring a high-perfor
 
 ### Backend (Rust)
 - **Framework**: Actix Web, SeaORM, SQLite, JWT, Argon2
-- **Architecture**: Workspace structure with `api`, `common`, `service`, `entity`, `migration`
+- **Architecture**: Workspace structure with `api` (includes startup initialization in `api/src/db_init.rs`), `common`, `service`, `entity`
 - **Features**:
   - Authentication: Login, Register, Password Reset
   - User Center: Profile Management, Password Change, Avatar Upload

@@ -6,11 +6,11 @@ BASE_URL="http://127.0.0.1:9123"
 echo "=== 测试 1: 登录 ==="
 LOGIN_RESPONSE=$(curl -s -X POST $BASE_URL/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"userName":"admin","password":"123456"}')
+  -d '{"userName":"Super","password":"123456"}')
 
 echo "$LOGIN_RESPONSE" | jq .
 
-TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r .token)
+TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r .data.token)
 
 if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
   echo "❌ 登录失败"

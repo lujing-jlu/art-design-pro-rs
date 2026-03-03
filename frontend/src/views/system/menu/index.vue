@@ -28,7 +28,7 @@
 
       <ArtTable
         ref="tableRef"
-        rowKey="path"
+        :row-key="getRowKey"
         :loading="loading"
         :columns="columns"
         :data="filteredTableData"
@@ -53,6 +53,8 @@
   import { formatMenuTitle } from '@/utils/router'
   import ArtButtonTable from '@/components/core/forms/art-button-table/index.vue'
   import { useTableColumns } from '@/hooks/core/useTableColumns'
+  import { useMenuStore } from '@/store/modules/menu'
+  import { MenuProcessor } from '@/router/core/MenuProcessor'
   import type { AppRouteRecord } from '@/types/router'
   import MenuDialog from './modules/menu-dialog.vue'
   import {
@@ -69,6 +71,8 @@
   const loading = ref(false)
   const isExpanded = ref(false)
   const tableRef = ref()
+  const menuStore = useMenuStore()
+  const menuProcessor = new MenuProcessor()
 
   // 弹窗相关
   const dialogVisible = ref(false)
@@ -118,6 +122,18 @@
       throw error instanceof Error ? error : new Error('获取菜单失败')
     } finally {
       loading.value = false
+    }
+  }
+
+  /**
+   * 同步运行时左侧菜单（避免修改后需重新登录才生效）
+   */
+  const syncRuntimeMenuList = async (): Promise<void> => {
+    try {
+      const latestMenuList = await menuProcessor.getMenuList()
+      menuStore.setMenuList(latestMenuList)
+    } catch (error) {
+      console.warn('[Menu] 同步运行时菜单失败', error)
     }
   }
 
@@ -237,6 +253,14 @@
 
   // 数据相关
   const tableData = ref<AppRouteRecord[]>([])
+
+  /**
+   * 表格行唯一 key，优先使用后端 id，避免同 path 菜单导致展开状态冲突
+   */
+  const getRowKey = (row: AppRouteRecord): string | number => {
+    if (row.id !== undefined && row.id !== null) return row.id
+    return `${row.path || ''}-${String(row.name || '')}-${String(row.meta?.authMark || '')}`
+  }
 
   /**
    * 重置搜索条件
@@ -397,11 +421,7 @@
    */
   const handleEditAuth = (row: AppRouteRecord): void => {
     dialogType.value = 'button'
-    editData.value = {
-      title: row.meta?.title,
-      authMark: row.meta?.authMark,
-      id: row.id
-    }
+    editData.value = row
     currentParentId.value = undefined
     lockMenuType.value = false
     dialogVisible.value = true
@@ -410,28 +430,68 @@
   /**
    * 菜单表单数据类型
    */
-  interface MenuFormData extends Api.SystemManage.MenuPayload {}
+  interface MenuFormData {
+    id?: number
+    menuType?: 'menu' | 'button'
+    type?: string
+    path?: string
+    name?: string
+    label?: string
+    title?: string
+    component?: string
+    icon?: string
+    sort?: number
+    keepAlive?: boolean
+    isHide?: boolean
+    isHideTab?: boolean
+    link?: string
+    isIframe?: boolean
+    showBadge?: boolean
+    showTextBadge?: string
+    fixedTab?: boolean
+    activePath?: string
+    isFullPage?: boolean
+    roles?: string[]
+    authName?: string
+    authLabel?: string
+    authMark?: string
+  }
 
   /**
    * 提交表单数据
    * @param formData 表单数据
    */
   const handleSubmit = async (formData: MenuFormData): Promise<void> => {
-    const payload: Api.SystemManage.MenuPayload = {
-      ...formData,
-      id: editData.value?.id,
-      parentId: currentParentId.value,
-      type: formData.menuType || formData.type || 'menu',
-      meta:
-        formData.menuType === 'button'
-          ? {
-              title: formData.authName || formData.title || formData.name,
+    const currentType = formData.menuType || formData.type || 'menu'
+
+    const payload: Api.SystemManage.MenuPayload =
+      currentType === 'button'
+        ? {
+            id: editData.value?.id,
+            parentId: currentParentId.value,
+            path: (formData.authLabel || editData.value?.path || '').trim(),
+            name: (editData.value?.name || formData.authLabel || 'AuthButton').trim(),
+            title: (formData.authName || editData.value?.meta?.title || '').trim(),
+            type: 'button',
+            meta: {
+              title: formData.authName || editData.value?.meta?.title || '',
               authMark: formData.authLabel || formData.authMark,
               isAuthButton: true,
               parentPath: editData.value?.meta?.parentPath || editData.value?.path || ''
             }
-          : {
-              title: formData.name,
+          }
+        : {
+            id: editData.value?.id,
+            parentId: currentParentId.value,
+            path: (formData.path || '').trim(),
+            name: (formData.label || formData.name || '').trim(),
+            title: (formData.name || '').trim(),
+            component: formData.component,
+            icon: formData.icon,
+            sort: formData.sort,
+            type: 'menu',
+            meta: {
+              title: formData.name || '',
               icon: formData.icon,
               roles: formData.roles,
               sort: formData.sort,
@@ -446,7 +506,7 @@
               activePath: formData.activePath,
               isFullPage: formData.isFullPage
             }
-    }
+          }
 
     if (editData.value?.id) {
       await fetchUpdateMenu(payload)
@@ -457,7 +517,8 @@
     }
 
     dialogVisible.value = false
-    getMenuList()
+    await getMenuList()
+    await syncRuntimeMenuList()
   }
 
   /**
@@ -473,7 +534,8 @@
       if (row?.id) {
         await fetchDeleteMenu(row.id)
         ElMessage.success('删除成功')
-        getMenuList()
+        await getMenuList()
+        await syncRuntimeMenuList()
       }
     } catch (error) {
       if (error !== 'cancel') {
@@ -495,7 +557,8 @@
       if (row?.id) {
         await fetchDeleteMenu(row.id)
         ElMessage.success('删除成功')
-        getMenuList()
+        await getMenuList()
+        await syncRuntimeMenuList()
       }
     } catch (error) {
       if (error !== 'cancel') {

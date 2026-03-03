@@ -222,7 +222,7 @@ pub async fn admin_menu_list(state: web::Data<AppState>, req: HttpRequest) -> im
     }
 }
 
-#[post("/")]
+#[post("")]
 pub async fn create_menu(
     state: web::Data<AppState>,
     req: HttpRequest,
@@ -245,7 +245,7 @@ pub async fn create_menu(
     }
 }
 
-#[put("/")]
+#[put("")]
 pub async fn update_menu(
     state: web::Data<AppState>,
     req: HttpRequest,

@@ -378,13 +378,14 @@ pub async fn create_menu(
     let meta_json = serde_json::to_string(&meta)
         .map_err(|e| AppError::Validation(format!("meta 序列化失败: {}", e)))?;
 
-    if menu::Entity::find()
-        .filter(menu::Column::Path.eq(&payload.path))
-        .filter(menu::Column::ParentId.eq(payload.parentId))
-        .one(db)
-        .await?
-        .is_some()
-    {
+    let mut dup_query = menu::Entity::find().filter(menu::Column::Path.eq(&payload.path));
+    dup_query = if let Some(parent_id) = payload.parentId {
+        dup_query.filter(menu::Column::ParentId.eq(parent_id))
+    } else {
+        dup_query.filter(menu::Column::ParentId.is_null())
+    };
+
+    if dup_query.one(db).await?.is_some() {
         return Err(AppError::Validation("同级菜单 path 已存在".into()));
     }
 
@@ -415,29 +416,43 @@ pub async fn update_menu(
     let id = payload
         .id
         .ok_or_else(|| AppError::Validation("缺少 id".into()))?;
-    let mut model = menu::Entity::find_by_id(id)
+    let model = menu::Entity::find_by_id(id)
         .one(db)
         .await?
         .ok_or_else(|| AppError::NotFound("菜单不存在".into()))?;
 
-    model.parent_id = payload.parentId;
-    model.path = payload.path.clone();
-    model.name = payload.name.clone();
-    model.component = payload.component.clone();
-    model.title = payload.title.clone();
-    model.icon = payload.icon.clone();
-    model.sort = payload.sort.unwrap_or(1);
-    model.r#type = payload.r#type.unwrap_or_else(|| "menu".to_string());
+    let mut dup_query = menu::Entity::find()
+        .filter(menu::Column::Path.eq(&payload.path))
+        .filter(menu::Column::Id.ne(id));
+    dup_query = if let Some(parent_id) = payload.parentId {
+        dup_query.filter(menu::Column::ParentId.eq(parent_id))
+    } else {
+        dup_query.filter(menu::Column::ParentId.is_null())
+    };
+
+    if dup_query.one(db).await?.is_some() {
+        return Err(AppError::Validation("同级菜单 path 已存在".into()));
+    }
+
     let meta = payload.meta.clone().unwrap_or(RouteMeta {
         title: payload.title.clone(),
         ..Default::default()
     });
-    model.meta = Some(
+
+    let mut active: menu::ActiveModel = model.into();
+    active.parent_id = Set(payload.parentId);
+    active.path = Set(payload.path.clone());
+    active.name = Set(payload.name.clone());
+    active.component = Set(payload.component.clone());
+    active.title = Set(payload.title.clone());
+    active.icon = Set(payload.icon.clone());
+    active.sort = Set(payload.sort.unwrap_or(1));
+    active.r#type = Set(payload.r#type.unwrap_or_else(|| "menu".to_string()));
+    active.meta = Set(Some(
         serde_json::to_string(&meta)
             .map_err(|e| AppError::Validation(format!("meta 序列化失败: {}", e)))?,
-    );
+    ));
 
-    let active: menu::ActiveModel = model.into();
     let updated = active.update(db).await?;
 
     menu_record_to_route(&updated)

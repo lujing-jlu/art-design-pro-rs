@@ -3,11 +3,11 @@ use actix_files::Files;
 use actix_web::{middleware as actix_middleware, web, App, HttpServer};
 use dotenvy::dotenv;
 use env_logger;
-use migration::{Migrator, MigratorTrait};
 use sea_orm::Database;
 use std::{env, fs};
 
 mod config;
+mod db_init;
 mod handlers;
 mod middleware;
 use middleware as api_middleware;
@@ -28,10 +28,10 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to connect to database");
 
-    log::info!("Running migrations...");
-    Migrator::up(&db, None)
+    log::info!("Initializing database schema and seed data...");
+    db_init::initialize_database(&db)
         .await
-        .expect("Failed to run migrations");
+        .expect("Failed to initialize database");
 
     let state = AppState { db };
     // 确保上传目录存在，避免 actix-files 报错
